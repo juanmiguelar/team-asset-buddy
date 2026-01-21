@@ -106,8 +106,8 @@ const CreateAsset = () => {
       <main className="container mx-auto px-4 py-6 pb-24">
         <Card className="max-w-2xl mx-auto shadow-elevated">
           <CardHeader>
-            <div className="w-14 h-14 rounded-xl gradient-primary flex items-center justify-center shadow-soft mb-4">
-              <Package className="w-7 h-7 text-white" />
+            <div className="w-14 h-14 rounded-xl bg-primary flex items-center justify-center shadow-soft mb-4">
+              <Package className="w-7 h-7 text-primary-foreground" />
             </div>
             <CardTitle className="text-2xl">Crear Nuevo Activo</CardTitle>
             <CardDescription>

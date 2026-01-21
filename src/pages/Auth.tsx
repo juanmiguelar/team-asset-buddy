@@ -69,12 +69,12 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 gradient-hero">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-primary">
       <Card className="w-full max-w-md shadow-elevated">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 rounded-2xl gradient-primary flex items-center justify-center shadow-soft">
-              <Package className="w-8 h-8 text-white" />
+            <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center shadow-soft">
+              <Package className="w-8 h-8 text-primary-foreground" />
             </div>
           </div>
           <CardTitle className="text-2xl">Gestor de Inventario</CardTitle>

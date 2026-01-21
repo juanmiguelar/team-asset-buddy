@@ -125,8 +125,8 @@ const Dashboard = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
-          <div className="w-16 h-16 rounded-2xl gradient-primary flex items-center justify-center shadow-soft mx-auto animate-pulse">
-            <Package className="w-8 h-8 text-white" />
+          <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center shadow-soft mx-auto animate-pulse">
+            <Package className="w-8 h-8 text-primary-foreground" />
           </div>
           <p className="text-muted-foreground">Cargando...</p>
         </div>
@@ -140,8 +140,8 @@ const Dashboard = () => {
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-soft">
-              <Package className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-soft">
+              <Package className="w-5 h-5 text-primary-foreground" />
             </div>
             <div>
               <h1 className="font-bold text-lg">Gestor de Inventario</h1>
@@ -235,14 +235,14 @@ const Dashboard = () => {
         {/* Employee Dashboard */}
         <div className="space-y-6">
           {/* Scan CTA */}
-          <Card className="gradient-hero text-white shadow-elevated">
+          <Card className="bg-primary text-primary-foreground shadow-elevated">
             <CardContent className="pt-8 pb-8 text-center">
               <QrCode className="w-16 h-16 mx-auto mb-4 opacity-90" />
               <h2 className="text-2xl font-bold mb-2">Escanear Código QR</h2>
               <p className="mb-6 opacity-90">
                 Asigna o devuelve activos y licencias
               </p>
-              <Button variant="scan" size="lg" onClick={handleScanQR} className="bg-white/20 hover:bg-white/30 backdrop-blur-sm">
+              <Button variant="secondary" size="lg" onClick={handleScanQR}>
                 <QrCode className="w-6 h-6" />
                 Abrir Escáner
               </Button>
