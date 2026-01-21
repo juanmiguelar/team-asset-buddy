@@ -213,8 +213,8 @@ const AssetDetail = () => {
         <Card className="max-w-2xl mx-auto shadow-elevated">
           <CardHeader>
             <div className="flex items-start justify-between mb-2">
-              <div className="w-14 h-14 rounded-xl gradient-primary flex items-center justify-center shadow-soft">
-                <Package className="w-7 h-7 text-white" />
+              <div className="w-14 h-14 rounded-xl bg-primary flex items-center justify-center shadow-soft">
+                <Package className="w-7 h-7 text-primary-foreground" />
               </div>
               <Badge className={getStatusColor(asset.status)}>
                 {getStatusText(asset.status)}

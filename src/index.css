@@ -44,10 +44,7 @@ All colors MUST be HSL.
 
     --radius: 0.75rem;
 
-    --gradient-primary: linear-gradient(135deg, hsl(263 70% 50%), hsl(263 70% 65%));
-    --gradient-secondary: linear-gradient(135deg, hsl(189 95% 52%), hsl(189 95% 65%));
-    --gradient-hero: linear-gradient(135deg, hsl(263 70% 50%) 0%, hsl(189 95% 52%) 100%);
-    --shadow-elevated: 0 10px 40px -10px hsl(263 70% 50% / 0.3);
+    --shadow-elevated: 0 10px 40px -10px hsl(var(--primary) / 0.25);
     --shadow-soft: 0 2px 8px hsl(240 10% 10% / 0.08);
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --chart-1: 158 64% 51%;
@@ -108,10 +105,7 @@ All colors MUST be HSL.
     --input: 0 0% 32%;
     --ring: 158 64% 51%;
 
-    --gradient-primary: linear-gradient(135deg, hsl(263 70% 55%), hsl(263 70% 70%));
-    --gradient-secondary: linear-gradient(135deg, hsl(189 95% 52%), hsl(189 95% 65%));
-    --gradient-hero: linear-gradient(135deg, hsl(263 70% 55%) 0%, hsl(189 95% 52%) 100%);
-    --shadow-elevated: 0 10px 40px -10px hsl(263 70% 55% / 0.4);
+    --shadow-elevated: 0 10px 40px -10px hsl(var(--primary) / 0.3);
     --shadow-soft: 0 2px 8px hsl(0 0% 0% / 0.3);
     --chart-1: 156 71% 66%;
     --chart-2: 141 76% 73%;
@@ -153,18 +147,6 @@ All colors MUST be HSL.
 }
 
 @layer utilities {
-  .gradient-primary {
-    background: var(--gradient-primary);
-  }
-
-  .gradient-secondary {
-    background: var(--gradient-secondary);
-  }
-
-  .gradient-hero {
-    background: var(--gradient-hero);
-  }
-
   .shadow-elevated {
     box-shadow: var(--shadow-elevated);
   }

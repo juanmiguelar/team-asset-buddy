@@ -56,8 +56,8 @@ const Scanner = () => {
       <main className="container mx-auto px-4 py-8">
         <Card className="max-w-md mx-auto shadow-elevated">
           <CardHeader className="text-center">
-            <div className="w-20 h-20 rounded-2xl gradient-secondary flex items-center justify-center mx-auto mb-4 shadow-soft">
-              <QrCode className="w-10 h-10 text-white" />
+            <div className="w-20 h-20 rounded-2xl bg-secondary flex items-center justify-center mx-auto mb-4 shadow-soft">
+              <QrCode className="w-10 h-10 text-secondary-foreground" />
             </div>
             <CardTitle className="text-2xl">Escanear Código QR</CardTitle>
             <CardDescription>
