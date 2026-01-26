@@ -1,252 +1,259 @@
 
-# Multi-Tenancy with Organizations Implementation Plan
+
+# Admin Panel for License/Asset Management
 
 ## Overview
-Transform the current single-tenant inventory management system into a multi-tenant SaaS platform where each company (organization) has completely isolated data, their own admin users, and organization-specific settings.
+Implement a complete admin management panel that enables organization admins to create, edit, and manage licenses and assets. This includes individual creation forms, edit capabilities, bulk CSV import, and archive/retire functionality.
+
+## Current State Analysis
+- Asset creation exists (`CreateAsset.tsx`) with basic form
+- No license creation capability
+- No edit functionality for assets or licenses
+- Detail pages exist but are read-only
+- Status management is limited to check-in/check-out
 
 ## Architecture
 
 ```text
-                     +------------------+
-                     |  Organizations   |
-                     +------------------+
-                             |
-          +------------------+------------------+
-          |                  |                  |
-          v                  v                  v
-   +------------+     +------------+     +------------+
-   | Org A Data |     | Org B Data |     | Org C Data |
-   +------------+     +------------+     +------------+
-          |                  |                  |
-   +------+------+    +------+------+    +------+------+
-   |  Members    |    |  Members    |    |  Members    |
-   | Assets      |    | Assets      |    | Assets      |
-   | Licenses    |    | Licenses    |    | Licenses    |
-   | Audit Logs  |    | Audit Logs  |    | Audit Logs  |
-   +-------------+    +-------------+    +-------------+
+Admin Dashboard
+      |
+      +-- Create Asset (exists)
+      +-- Create License (NEW)
+      +-- Bulk Import (NEW)
+      |
+Asset/License Detail Pages
+      |
+      +-- Edit Mode (NEW)
+      +-- Status Management (NEW)
+          +-- Archive/Retire
+          +-- Set Maintenance
 ```
 
-## Database Schema Changes
+## Implementation Plan
 
-### New Tables
+### 1. Create License Page (`src/pages/CreateLicense.tsx`)
 
-**1. organizations**
-| Column | Type | Description |
-|--------|------|-------------|
-| id | UUID | Primary key |
-| name | TEXT | Organization display name |
-| slug | TEXT | URL-friendly unique identifier |
-| settings | JSONB | Organization-specific settings |
-| created_at | TIMESTAMPTZ | Creation timestamp |
-| updated_at | TIMESTAMPTZ | Last update timestamp |
+New page following the CreateAsset pattern with:
 
-**2. organization_members** (Replaces role on profiles)
-| Column | Type | Description |
-|--------|------|-------------|
-| id | UUID | Primary key |
-| organization_id | UUID | FK to organizations |
-| user_id | UUID | FK to profiles |
-| role | org_role (enum) | 'owner', 'admin', 'member' |
-| created_at | TIMESTAMPTZ | When user joined |
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| Product | Select | Yes | adobe_cc, jetbrains, office_365, github, other |
+| Full License Key | Password Input | Yes | Sensitive - shows masked after save |
+| Expiration Date | Date Picker | No | Optional expiry |
+| Notes | Textarea | No | Additional info |
 
-**3. organization_invites**
-| Column | Type | Description |
-|--------|------|-------------|
-| id | UUID | Primary key |
-| organization_id | UUID | FK to organizations |
-| email | TEXT | Invited email address |
-| role | org_role | Role to assign on acceptance |
-| invited_by | UUID | FK to profiles |
-| token | TEXT | Unique invite token |
-| expires_at | TIMESTAMPTZ | Invite expiration |
-| accepted_at | TIMESTAMPTZ | When accepted (null if pending) |
-| created_at | TIMESTAMPTZ | Creation timestamp |
+**Key Logic:**
+- Auto-generate `seat_key_masked` from full key (show last 4 characters)
+- Generate QR code pattern: `license:{uuid}`
+- Associate with current organization
+- Create audit log entry on creation
+- Admin-only access (redirect if not `isOrgAdmin`)
 
-### Existing Table Modifications
+### 2. Edit Asset Page (`src/pages/EditAsset.tsx`)
 
-**Add organization_id to:**
-- `assets` - Required, FK to organizations
-- `licenses` - Required, FK to organizations  
-- `audit_log` - Required, FK to organizations
-- `requests` - Required, FK to organizations
+Edit form that loads existing asset data:
 
-### New Enum Type
-```sql
-CREATE TYPE org_role AS ENUM ('owner', 'admin', 'member');
+| Field | Editable | Notes |
+|-------|----------|-------|
+| Name | Yes | Required |
+| Category | Yes | Select from enum |
+| Serial Number | Yes | Optional |
+| Location | Yes | Optional |
+| Notes | Yes | Optional |
+| Status | Yes | Admin can change status |
+
+**Status Options for Admin:**
+- Available
+- Assigned (only if has assignee)
+- Maintenance
+- Retired
+
+### 3. Edit License Page (`src/pages/EditLicense.tsx`)
+
+Edit form for licenses:
+
+| Field | Editable | Notes |
+|-------|----------|-------|
+| Product | Yes | Select from enum |
+| Full License Key | Yes | Shows current masked, can update |
+| Expiration Date | Yes | Date picker |
+| Notes | Yes | Optional |
+| Status | Yes | Admin control |
+
+**Status Options for Admin:**
+- Available
+- Assigned (only if has assignee)
+- Expired
+
+### 4. Add Admin Actions to Detail Pages
+
+**AssetDetail.tsx Modifications:**
+- Add "Edit" button (admin only) that navigates to edit page
+- Add "Archive/Retire" button with confirmation dialog
+- Add "Set Maintenance" quick action
+
+**LicenseDetail.tsx Modifications:**
+- Add "Edit" button (admin only)
+- Add "Mark Expired" action
+- Add delete capability with confirmation
+
+### 5. Bulk Import Component (`src/components/BulkImportDialog.tsx`)
+
+Modal dialog for CSV import:
+
+**CSV Format for Assets:**
+```csv
+name,category,serial_number,location,notes
+MacBook Pro 14,laptop,C02XK123,Office A,New laptop
+Dell Monitor 27,monitor,DELL456,Office B,
 ```
 
-### Security Functions
-
-**New security definer functions:**
-1. `get_user_org_id(user_id)` - Returns the organization ID for a user
-2. `has_org_role(user_id, org_id, role)` - Checks if user has specific role in org
-3. `is_org_admin(user_id, org_id)` - Checks if user is admin or owner in org
-
-## RLS Policy Updates
-
-All existing tables will be updated to scope data by organization:
-
-**Pattern for all org-scoped tables:**
-```sql
--- SELECT: Only see data from your organization
-USING (
-  organization_id = (
-    SELECT organization_id FROM organization_members 
-    WHERE user_id = auth.uid() LIMIT 1
-  )
-)
-
--- INSERT/UPDATE: Only modify data in your organization (admins only for create)
-WITH CHECK (
-  organization_id IN (
-    SELECT organization_id FROM organization_members 
-    WHERE user_id = auth.uid()
-  )
-  AND has_org_role(auth.uid(), organization_id, 'admin')
-)
+**CSV Format for Licenses:**
+```csv
+product,seat_key_full,expires_at,notes
+adobe_cc,XXXX-YYYY-ZZZZ-1234,2025-12-31,Team license
+office_365,ABCD-EFGH-IJKL-5678,,Personal
 ```
 
-## Implementation Steps
+**Import Flow:**
+1. Admin selects resource type (Assets or Licenses)
+2. Upload CSV file or paste content
+3. Preview parsed data in table
+4. Validate entries (highlight errors)
+5. Confirm import
+6. Show results (success/error count)
 
-### Phase 1: Database Schema Migration
+### 6. Dashboard Integration
 
-1. Create new enum type `org_role`
-2. Create `organizations` table with RLS
-3. Create `organization_members` table with RLS
-4. Create `organization_invites` table with RLS
-5. Create security definer functions
-6. Add `organization_id` column to existing tables (nullable initially for migration)
-7. Update `handle_new_user` trigger to create a default organization for new signups
-
-### Phase 2: Update Existing RLS Policies
-
-1. Drop existing policies on assets, licenses, audit_log, requests
-2. Create new organization-scoped policies for all tables
-3. Update the `licenses_safe` view to include organization context
-4. Update `is_admin` function to be organization-aware
-
-### Phase 3: AuthContext Updates
-
-Update `src/contexts/AuthContext.tsx` to:
-- Fetch current organization membership
-- Expose `currentOrganization` and `orgRole` 
-- Add organization switching capability (for users in multiple orgs)
-- Replace global `isAdmin` with organization-scoped `isOrgAdmin`
-
-### Phase 4: New Pages & Components
-
-**New Pages:**
-| File | Purpose |
-|------|---------|
-| `src/pages/OrganizationSettings.tsx` | Org name, settings, danger zone |
-| `src/pages/OrganizationMembers.tsx` | Member list, invite, role management |
-| `src/pages/AcceptInvite.tsx` | Accept organization invitation |
-| `src/pages/CreateOrganization.tsx` | Create new organization (for existing users) |
-
-**New Components:**
-| File | Purpose |
-|------|---------|
-| `src/components/OrganizationSwitcher.tsx` | Dropdown to switch between orgs |
-| `src/components/InviteMemberDialog.tsx` | Modal to invite new members |
-| `src/components/MemberRoleSelect.tsx` | Change member role dropdown |
-
-### Phase 5: Update Existing Pages
-
-**Dashboard.tsx:**
-- Show organization name in header
-- Add organization switcher
-- Filter data by current organization (automatic via RLS)
-- Add "Settings" navigation for org admins
-
-**CreateAsset.tsx:**
-- Automatically associate new assets with current organization
-- (No visible changes needed - organization_id added server-side)
-
-**Auth.tsx:**
-- After signup, redirect to organization creation flow
-- Handle invite token in URL for invited users
-
-## New User Flow
-
-```text
-User Signs Up
-     |
-     v
-+--------------------+
-| Create Organization|  <-- First-time user creates their org
-+--------------------+
-     |
-     v
-+--------------------+
-| Dashboard          |  <-- User is owner of their org
-+--------------------+
-```
-
-## Invited User Flow
-
-```text
-Admin Sends Invite
-     |
-     v
-Email with Link: /invite/accept?token=xxx
-     |
-     v
-+--------------------+
-| Accept Invite Page |  <-- User signs up or logs in
-+--------------------+
-     |
-     v
-+--------------------+
-| Dashboard          |  <-- User is member of org
-+--------------------+
-```
+Add new admin section to Dashboard:
+- Quick action button for "Import CSV"
+- Show recent licenses in admin panel (currently only shows assets)
+- Add "Create License" button alongside "Create Asset"
 
 ## Files to Create
 
 | File | Description |
 |------|-------------|
-| `supabase/migrations/xxxxx_multi_tenancy.sql` | Database schema changes |
-| `src/contexts/OrganizationContext.tsx` | Organization state management |
-| `src/pages/OrganizationSettings.tsx` | Settings page |
-| `src/pages/OrganizationMembers.tsx` | Member management page |
-| `src/pages/AcceptInvite.tsx` | Invite acceptance flow |
-| `src/components/OrganizationSwitcher.tsx` | Org switcher component |
-| `src/components/InviteMemberDialog.tsx` | Invite modal |
+| `src/pages/CreateLicense.tsx` | License creation form |
+| `src/pages/EditAsset.tsx` | Asset editing form |
+| `src/pages/EditLicense.tsx` | License editing form |
+| `src/components/BulkImportDialog.tsx` | CSV import modal |
+| `src/components/AdminActionsMenu.tsx` | Dropdown menu for admin actions |
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/contexts/AuthContext.tsx` | Add organization context integration |
-| `src/App.tsx` | Add new routes, wrap with OrganizationProvider |
-| `src/pages/Dashboard.tsx` | Add org name, switcher, settings link |
-| `src/pages/CreateAsset.tsx` | Pass organization_id on create |
-| `src/pages/Auth.tsx` | Handle invite tokens, post-signup org flow |
+| `src/App.tsx` | Add routes for new pages |
+| `src/pages/Dashboard.tsx` | Add license creation button, import button |
+| `src/pages/AssetDetail.tsx` | Add edit/archive buttons for admins |
+| `src/pages/LicenseDetail.tsx` | Add edit/delete buttons for admins |
 
-## Security Considerations
+## Route Structure
 
-1. **Data Isolation**: All queries automatically scoped by organization via RLS
-2. **Role Hierarchy**: owner > admin > member with appropriate permissions
-3. **Invite Security**: Token-based invites with expiration (7 days default)
-4. **Privilege Escalation Prevention**: Roles stored in separate `organization_members` table (not in profiles)
-5. **Cross-Org Protection**: Users cannot access resources from organizations they don't belong to
+| Route | Component | Access |
+|-------|-----------|--------|
+| `/admin/create-asset` | CreateAsset | Admin |
+| `/admin/create-license` | CreateLicense | Admin |
+| `/admin/edit-asset/:id` | EditAsset | Admin |
+| `/admin/edit-license/:id` | EditLicense | Admin |
 
-## Organization Settings (JSONB structure)
+## Database Considerations
 
-```json
-{
-  "allowSelfAssignment": true,
-  "requireApprovalForCheckout": false,
-  "defaultAssetLocation": "Main Office",
-  "notificationEmail": "admin@company.com",
-  "timezone": "America/Costa_Rica"
+No schema changes required - all necessary columns and enums already exist:
+- `asset_status`: available, assigned, maintenance, retired
+- `license_status`: available, assigned, expired
+- `audit_action`: includes 'edit', 'create', 'retire'
+
+## Security Implementation
+
+All admin pages will:
+1. Check `isOrgAdmin` from OrganizationContext
+2. Redirect to dashboard if not admin
+3. Scope all operations to current organization
+4. Create audit log entries for all changes
+
+## Masked Key Generation Logic
+
+```typescript
+function generateMaskedKey(fullKey: string): string {
+  if (fullKey.length <= 4) return '****';
+  const lastFour = fullKey.slice(-4);
+  return `****-****-****-${lastFour}`;
 }
 ```
 
-## Technical Notes
+## CSV Parsing Approach
 
-- The `profiles` table `role` column will be deprecated but kept for backward compatibility during migration
-- New users without an invite will be prompted to create an organization
-- Users can belong to multiple organizations but work in one at a time
-- The current organization is stored in React context (not localStorage for security)
-- All existing RLS policies will be replaced with organization-scoped versions
+Use browser FileReader API to parse CSV:
+- Split by newlines, then by commas
+- Handle quoted fields with commas
+- Validate against required fields
+- Type-check enum values
+- Return array of validated objects
+
+## UI/UX Patterns
+
+Following existing patterns:
+- Cards with shadow-elevated class
+- Form fields with Label + Input pattern
+- Select components for enums
+- Toast notifications for success/error
+- Loading spinners during async operations
+- Confirmation dialogs for destructive actions
+
+## Audit Trail
+
+All operations will log to audit_log:
+
+| Action | Resource Type | Metadata |
+|--------|--------------|----------|
+| create | asset/license | Initial values |
+| edit | asset/license | Changed fields |
+| retire | asset | Previous status |
+| delete | license | Product name |
+
+---
+
+## Technical Implementation Details
+
+### CreateLicense Component Structure
+
+```typescript
+interface LicenseFormData {
+  product: "adobe_cc" | "jetbrains" | "office_365" | "github" | "other";
+  seat_key_full: string;
+  expires_at: string | null;
+  notes: string;
+}
+```
+
+### Edit Form Pattern
+
+Both edit forms will:
+1. Fetch existing data on mount using resource ID from URL params
+2. Populate form with current values
+3. Track changed fields for audit log
+4. Submit updates with optimistic UI
+5. Navigate back to detail page on success
+
+### Bulk Import Validation Rules
+
+**Assets:**
+- name: required, max 255 chars
+- category: must match enum values
+- serial_number: optional, max 100 chars
+- location: optional, max 255 chars
+
+**Licenses:**
+- product: must match enum values
+- seat_key_full: required, max 500 chars
+- expires_at: optional, valid date format (YYYY-MM-DD)
+
+### Error Handling
+
+- Form validation errors shown inline
+- API errors shown via toast
+- CSV parse errors shown in preview table
+- Network errors with retry option
+
