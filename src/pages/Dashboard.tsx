@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { OrganizationSwitcher } from "@/components/OrganizationSwitcher";
-import { Package, Key, QrCode, LogOut, Plus, Laptop, Users, Settings } from "lucide-react";
+import { BulkImportDialog } from "@/components/BulkImportDialog";
+import { Package, Key, QrCode, LogOut, Plus, Laptop, Users, Settings, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 interface Asset {
@@ -172,12 +173,27 @@ const Dashboard = () => {
         {/* Admin Dashboard */}
         {isOrgAdmin && (
           <div className="space-y-6 mb-8">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <h2 className="text-2xl font-bold">Panel de Administración</h2>
-              <Button variant="hero" onClick={() => navigate("/admin/create-asset")}>
-                <Plus className="w-4 h-4" />
-                Nuevo Activo
-              </Button>
+              <div className="flex gap-2">
+                <BulkImportDialog
+                  trigger={
+                    <Button variant="outline">
+                      <Upload className="w-4 h-4" />
+                      Importar CSV
+                    </Button>
+                  }
+                  onImportComplete={fetchData}
+                />
+                <Button variant="outline" onClick={() => navigate("/admin/create-license")}>
+                  <Key className="w-4 h-4" />
+                  Nueva Licencia
+                </Button>
+                <Button variant="hero" onClick={() => navigate("/admin/create-asset")}>
+                  <Plus className="w-4 h-4" />
+                  Nuevo Activo
+                </Button>
+              </div>
             </div>
 
             {/* KPIs */}

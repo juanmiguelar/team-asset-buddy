@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOrganization } from "@/contexts/OrganizationContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +17,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { AdminActionsMenu } from "@/components/AdminActionsMenu";
 import { ArrowLeft, Key, Loader2, User, Calendar, CheckCircle2, Copy, Eye, EyeOff, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 
@@ -49,13 +51,15 @@ const productLabels: Record<string, string> = {
 const LicenseDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user, isAdmin } = useAuth();
+  const { user } = useAuth();
+  const { isOrgAdmin, currentOrganization } = useOrganization();
   const [license, setLicense] = useState<License | null>(null);
   const [assignee, setAssignee] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
   const [revealLoading, setRevealLoading] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -83,7 +87,7 @@ const LicenseDetail = () => {
     let data = null;
     let error = null;
 
-    if (isAdmin) {
+    if (isOrgAdmin) {
       const result = await supabase
         .from("licenses")
         .select("id, product, status, seat_key_masked, assignee_user_id, expires_at, notes, qr_code, created_at, updated_at")
@@ -133,7 +137,7 @@ const LicenseDetail = () => {
   };
 
   const handleRevealKey = async () => {
-    if (!license || !isAdmin) return;
+    if (!license || !isOrgAdmin) return;
 
     setRevealLoading(true);
     const { data, error } = await supabase.rpc("get_license_full_key", {
@@ -291,7 +295,7 @@ const LicenseDetail = () => {
               <div className="w-14 h-14 rounded-xl bg-primary flex items-center justify-center shadow-soft">
                 <Key className="w-7 h-7 text-primary-foreground" />
               </div>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
                 {isExpired && (
                   <Badge className="bg-red-500/10 text-red-700 dark:text-red-400">
                     Expirada
@@ -300,6 +304,36 @@ const LicenseDetail = () => {
                 <Badge className={getStatusColor(license.status)}>
                   {getStatusText(license.status)}
                 </Badge>
+                {isOrgAdmin && (
+                  <AdminActionsMenu
+                    resourceType="license"
+                    status={license.status}
+                    onEdit={() => navigate(`/admin/edit-license/${license.id}`)}
+                    onMarkExpired={async () => {
+                      const { error } = await supabase
+                        .from("licenses")
+                        .update({ status: "expired", updated_at: new Date().toISOString() })
+                        .eq("id", license.id);
+                      if (error) {
+                        toast.error("Error al cambiar estado");
+                      } else {
+                        if (user && currentOrganization) {
+                          await supabase.from("audit_log").insert({
+                            resource_type: "license",
+                            resource_id: license.id,
+                            action: "edit",
+                            by_user_id: user.id,
+                            organization_id: currentOrganization.id,
+                            metadata: { status_change: { old: license.status, new: "expired" } },
+                          });
+                        }
+                        toast.success("Licencia marcada como expirada");
+                        fetchLicense();
+                      }
+                    }}
+                    onDelete={() => setDeleteDialogOpen(true)}
+                  />
+                )}
               </div>
             </div>
             <CardTitle className="text-2xl">
@@ -383,7 +417,7 @@ const LicenseDetail = () => {
             )}
 
             {/* Admin Section - Reveal Full Key */}
-            {isAdmin && (
+            {isOrgAdmin && (
               <div className="p-4 border-2 border-dashed border-primary/30 rounded-lg bg-primary/5">
                 <div className="flex items-center gap-2 mb-3">
                   <ShieldAlert className="w-5 h-5 text-primary" />
@@ -519,6 +553,39 @@ const LicenseDetail = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Eliminar licencia?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta acción no se puede deshacer. Se eliminará permanentemente la licencia
+                de {productLabels[license.product] || license.product}.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-red-600 hover:bg-red-700"
+                onClick={async () => {
+                  const { error } = await supabase
+                    .from("licenses")
+                    .delete()
+                    .eq("id", license.id);
+                  if (error) {
+                    toast.error("Error al eliminar licencia");
+                  } else {
+                    toast.success("Licencia eliminada");
+                    navigate("/");
+                  }
+                }}
+              >
+                Eliminar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </main>
     </div>
   );
