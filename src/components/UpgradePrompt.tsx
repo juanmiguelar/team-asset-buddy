@@ -101,6 +101,46 @@ export const UpgradePrompt = ({ open, onOpenChange, limitType, featureName }: Up
   );
 };
 
+// Standalone card version for inline display (not a dialog)
+export const UpgradePromptCard = ({ limitType, featureName }: { limitType: LimitType; featureName?: string }) => {
+  const navigate = useNavigate();
+  const { limits, plan } = useSubscription();
+  
+  const config = limitConfig[limitType];
+  const Icon = config.icon;
+  
+  const limit = limitType === 'assets' ? limits.maxAssets 
+              : limitType === 'licenses' ? limits.maxLicenses 
+              : limitType === 'members' ? limits.maxMembers 
+              : 0;
+
+  return (
+    <div className="max-w-md mx-auto p-6 rounded-lg border bg-card shadow-soft text-center">
+      <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+        <Icon className="w-8 h-8 text-primary" />
+      </div>
+      <h2 className="text-xl font-semibold mb-2">{config.title}</h2>
+      <p className="text-muted-foreground mb-4">
+        {config.getMessage(limit, featureName)}
+      </p>
+
+      <div className="bg-muted/50 rounded-lg p-4 mb-4">
+        <p className="text-sm text-muted-foreground mb-2">
+          Plan actual: <span className="font-medium text-foreground capitalize">{plan}</span>
+        </p>
+        <p className="text-sm">
+          Actualiza a <span className="font-semibold text-primary">Pro</span> para obtener más capacidad y desbloquear funciones avanzadas.
+        </p>
+      </div>
+
+      <Button onClick={() => navigate("/billing")} className="w-full">
+        <Crown className="w-4 h-4 mr-2" />
+        Ver Planes
+      </Button>
+    </div>
+  );
+};
+
 // Hook for easy usage
 export const useUpgradePrompt = () => {
   const [isOpen, setIsOpen] = useState(false);
