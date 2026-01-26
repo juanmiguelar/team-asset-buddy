@@ -1,1 +1,4 @@
 project_id = "hoaivkgkgomhfxtkbyad"
+
+[functions.bmc-webhook]
+verify_jwt = false

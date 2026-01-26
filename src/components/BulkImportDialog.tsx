@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { useOrganization } from "@/contexts/OrganizationContext";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -29,8 +30,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Upload, FileText, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { Upload, FileText, AlertCircle, CheckCircle2, Loader2, Crown } from "lucide-react";
 import { toast } from "sonner";
+import { useUpgradePrompt } from "@/components/UpgradePrompt";
 
 type ResourceType = "assets" | "licenses";
 
@@ -143,6 +145,8 @@ interface BulkImportDialogProps {
 
 export function BulkImportDialog({ trigger, onImportComplete }: BulkImportDialogProps) {
   const { currentOrganization } = useOrganization();
+  const { hasFeature, refreshSubscription } = useSubscription();
+  const { showUpgradePrompt, UpgradePromptDialog } = useUpgradePrompt();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [resourceType, setResourceType] = useState<ResourceType>("assets");
@@ -153,6 +157,15 @@ export function BulkImportDialog({ trigger, onImportComplete }: BulkImportDialog
   const [step, setStep] = useState<"input" | "preview" | "result">("input");
   const [importResult, setImportResult] = useState({ success: 0, errors: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleOpenChange = (newOpen: boolean) => {
+    if (newOpen && !hasFeature('bulkImport')) {
+      showUpgradePrompt('feature', 'Importación CSV masiva');
+      return;
+    }
+    setOpen(newOpen);
+    if (!newOpen) reset();
+  };
 
   const reset = () => {
     setCsvContent("");
@@ -247,6 +260,7 @@ export function BulkImportDialog({ trigger, onImportComplete }: BulkImportDialog
     setImporting(false);
 
     if (successCount > 0) {
+      await refreshSubscription(); // Refresh usage counts
       onImportComplete?.();
     }
   };
@@ -256,199 +270,208 @@ export function BulkImportDialog({ trigger, onImportComplete }: BulkImportDialog
   const invalidCount = previewData.filter((d) => !d.valid).length;
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Importación Masiva</DialogTitle>
-          <DialogDescription>
-            Importa múltiples {resourceType === "assets" ? "activos" : "licencias"} desde un archivo CSV
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <UpgradePromptDialog />
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogTrigger asChild>{trigger}</DialogTrigger>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              Importación Masiva
+              <Badge variant="secondary" className="text-xs">
+                <Crown className="w-3 h-3 mr-1" />
+                Pro
+              </Badge>
+            </DialogTitle>
+            <DialogDescription>
+              Importa múltiples {resourceType === "assets" ? "activos" : "licencias"} desde un archivo CSV
+            </DialogDescription>
+          </DialogHeader>
 
-        {step === "input" && (
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <Label>Tipo de Recurso</Label>
-              <Select
-                value={resourceType}
-                onValueChange={(v) => setResourceType(v as ResourceType)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="assets">Activos</SelectItem>
-                  <SelectItem value="licenses">Licencias</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="p-4 bg-muted/50 rounded-lg text-sm">
-              <p className="font-medium mb-2">Formato CSV esperado:</p>
-              {resourceType === "assets" ? (
-                <code className="text-xs block bg-background p-2 rounded">
-                  name,category,serial_number,location,notes<br />
-                  MacBook Pro 14,laptop,C02XK123,Oficina A,Nuevo<br />
-                  Dell Monitor 27,monitor,DELL456,Oficina B,
-                </code>
-              ) : (
-                <code className="text-xs block bg-background p-2 rounded">
-                  product,seat_key_full,expires_at,notes<br />
-                  adobe_cc,XXXX-YYYY-ZZZZ-1234,2025-12-31,Licencia team<br />
-                  office_365,ABCD-EFGH-IJKL-5678,,Personal
-                </code>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label>Archivo CSV o contenido</Label>
-              <div className="flex gap-2">
-                <input
-                  type="file"
-                  accept=".csv"
-                  ref={fileInputRef}
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-                <Button
-                  variant="outline"
-                  onClick={() => fileInputRef.current?.click()}
+          {step === "input" && (
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <Label>Tipo de Recurso</Label>
+                <Select
+                  value={resourceType}
+                  onValueChange={(v) => setResourceType(v as ResourceType)}
                 >
-                  <Upload className="w-4 h-4 mr-2" />
-                  Subir archivo
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="assets">Activos</SelectItem>
+                    <SelectItem value="licenses">Licencias</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="p-4 bg-muted/50 rounded-lg text-sm">
+                <p className="font-medium mb-2">Formato CSV esperado:</p>
+                {resourceType === "assets" ? (
+                  <code className="text-xs block bg-background p-2 rounded">
+                    name,category,serial_number,location,notes<br />
+                    MacBook Pro 14,laptop,C02XK123,Oficina A,Nuevo<br />
+                    Dell Monitor 27,monitor,DELL456,Oficina B,
+                  </code>
+                ) : (
+                  <code className="text-xs block bg-background p-2 rounded">
+                    product,seat_key_full,expires_at,notes<br />
+                    adobe_cc,XXXX-YYYY-ZZZZ-1234,2025-12-31,Licencia team<br />
+                    office_365,ABCD-EFGH-IJKL-5678,,Personal
+                  </code>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Archivo CSV o contenido</Label>
+                <div className="flex gap-2">
+                  <input
+                    type="file"
+                    accept=".csv"
+                    ref={fileInputRef}
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Subir archivo
+                  </Button>
+                </div>
+                <Textarea
+                  placeholder="O pega el contenido CSV aquí..."
+                  value={csvContent}
+                  onChange={(e) => setCsvContent(e.target.value)}
+                  rows={8}
+                  className="font-mono text-sm"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={handlePreview}>
+                  <FileText className="w-4 h-4 mr-2" />
+                  Vista Previa
                 </Button>
               </div>
-              <Textarea
-                placeholder="O pega el contenido CSV aquí..."
-                value={csvContent}
-                onChange={(e) => setCsvContent(e.target.value)}
-                rows={8}
-                className="font-mono text-sm"
-              />
             </div>
+          )}
 
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setOpen(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handlePreview}>
-                <FileText className="w-4 h-4 mr-2" />
-                Vista Previa
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {step === "preview" && (
-          <div className="space-y-6">
-            <div className="flex items-center gap-4">
-              <Badge variant="outline" className="text-green-600">
-                <CheckCircle2 className="w-3 h-3 mr-1" />
-                {validCount} válidos
-              </Badge>
-              {invalidCount > 0 && (
-                <Badge variant="outline" className="text-red-600">
-                  <AlertCircle className="w-3 h-3 mr-1" />
-                  {invalidCount} con errores
+          {step === "preview" && (
+            <div className="space-y-6">
+              <div className="flex items-center gap-4">
+                <Badge variant="outline" className="text-green-600">
+                  <CheckCircle2 className="w-3 h-3 mr-1" />
+                  {validCount} válidos
                 </Badge>
-              )}
-            </div>
-
-            <div className="max-h-80 overflow-auto border rounded-lg">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">Estado</TableHead>
-                    {resourceType === "assets" ? (
-                      <>
-                        <TableHead>Nombre</TableHead>
-                        <TableHead>Categoría</TableHead>
-                        <TableHead>Serie</TableHead>
-                        <TableHead>Ubicación</TableHead>
-                      </>
-                    ) : (
-                      <>
-                        <TableHead>Producto</TableHead>
-                        <TableHead>Clave</TableHead>
-                        <TableHead>Expira</TableHead>
-                      </>
-                    )}
-                    <TableHead>Error</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(resourceType === "assets" ? parsedAssets : parsedLicenses).map(
-                    (item, idx) => (
-                      <TableRow key={idx} className={!item.valid ? "bg-red-50 dark:bg-red-950/20" : ""}>
-                        <TableCell>
-                          {item.valid ? (
-                            <CheckCircle2 className="w-4 h-4 text-green-600" />
-                          ) : (
-                            <AlertCircle className="w-4 h-4 text-red-600" />
-                          )}
-                        </TableCell>
-                        {resourceType === "assets" ? (
-                          <>
-                            <TableCell>{(item as ParsedAsset).name}</TableCell>
-                            <TableCell>{(item as ParsedAsset).category}</TableCell>
-                            <TableCell>{(item as ParsedAsset).serial_number}</TableCell>
-                            <TableCell>{(item as ParsedAsset).location}</TableCell>
-                          </>
-                        ) : (
-                          <>
-                            <TableCell>{(item as ParsedLicense).product}</TableCell>
-                            <TableCell className="font-mono text-xs">
-                              {generateMaskedKey((item as ParsedLicense).seat_key_full)}
-                            </TableCell>
-                            <TableCell>{(item as ParsedLicense).expires_at}</TableCell>
-                          </>
-                        )}
-                        <TableCell className="text-xs text-red-600">{item.error}</TableCell>
-                      </TableRow>
-                    )
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-
-            <div className="flex justify-between">
-              <Button variant="outline" onClick={() => setStep("input")}>
-                Volver
-              </Button>
-              <Button onClick={handleImport} disabled={validCount === 0 || importing}>
-                {importing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                    Importando...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="w-4 h-4 mr-2" />
-                    Importar {validCount} {resourceType === "assets" ? "activos" : "licencias"}
-                  </>
+                {invalidCount > 0 && (
+                  <Badge variant="outline" className="text-red-600">
+                    <AlertCircle className="w-3 h-3 mr-1" />
+                    {invalidCount} con errores
+                  </Badge>
                 )}
-              </Button>
-            </div>
-          </div>
-        )}
+              </div>
 
-        {step === "result" && (
-          <div className="space-y-6 text-center py-8">
-            <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto">
-              <CheckCircle2 className="w-8 h-8 text-green-600" />
+              <div className="max-h-80 overflow-auto border rounded-lg">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">Estado</TableHead>
+                      {resourceType === "assets" ? (
+                        <>
+                          <TableHead>Nombre</TableHead>
+                          <TableHead>Categoría</TableHead>
+                          <TableHead>Serie</TableHead>
+                          <TableHead>Ubicación</TableHead>
+                        </>
+                      ) : (
+                        <>
+                          <TableHead>Producto</TableHead>
+                          <TableHead>Clave</TableHead>
+                          <TableHead>Expira</TableHead>
+                        </>
+                      )}
+                      <TableHead>Error</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(resourceType === "assets" ? parsedAssets : parsedLicenses).map(
+                      (item, idx) => (
+                        <TableRow key={idx} className={!item.valid ? "bg-red-50 dark:bg-red-950/20" : ""}>
+                          <TableCell>
+                            {item.valid ? (
+                              <CheckCircle2 className="w-4 h-4 text-green-600" />
+                            ) : (
+                              <AlertCircle className="w-4 h-4 text-red-600" />
+                            )}
+                          </TableCell>
+                          {resourceType === "assets" ? (
+                            <>
+                              <TableCell>{(item as ParsedAsset).name}</TableCell>
+                              <TableCell>{(item as ParsedAsset).category}</TableCell>
+                              <TableCell>{(item as ParsedAsset).serial_number}</TableCell>
+                              <TableCell>{(item as ParsedAsset).location}</TableCell>
+                            </>
+                          ) : (
+                            <>
+                              <TableCell>{(item as ParsedLicense).product}</TableCell>
+                              <TableCell className="font-mono text-xs">
+                                {generateMaskedKey((item as ParsedLicense).seat_key_full)}
+                              </TableCell>
+                              <TableCell>{(item as ParsedLicense).expires_at}</TableCell>
+                            </>
+                          )}
+                          <TableCell className="text-xs text-red-600">{item.error}</TableCell>
+                        </TableRow>
+                      )
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="flex justify-between">
+                <Button variant="outline" onClick={() => setStep("input")}>
+                  Volver
+                </Button>
+                <Button onClick={handleImport} disabled={validCount === 0 || importing}>
+                  {importing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      Importando...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4 mr-2" />
+                      Importar {validCount} {resourceType === "assets" ? "activos" : "licencias"}
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
-            <div>
-              <h3 className="text-xl font-semibold mb-2">Importación Completada</h3>
-              <p className="text-muted-foreground">
-                Se importaron {importResult.success} {resourceType === "assets" ? "activos" : "licencias"} correctamente
-                {importResult.errors > 0 && ` (${importResult.errors} con errores)`}
-              </p>
+          )}
+
+          {step === "result" && (
+            <div className="space-y-6 text-center py-8">
+              <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto">
+                <CheckCircle2 className="w-8 h-8 text-green-600" />
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold mb-2">Importación Completada</h3>
+                <p className="text-muted-foreground">
+                  Se importaron {importResult.success} {resourceType === "assets" ? "activos" : "licencias"} correctamente
+                  {importResult.errors > 0 && ` (${importResult.errors} con errores)`}
+                </p>
+              </div>
+              <Button onClick={() => setOpen(false)}>Cerrar</Button>
             </div>
-            <Button onClick={() => setOpen(false)}>Cerrar</Button>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

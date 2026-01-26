@@ -20,13 +20,16 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Building2, Loader2, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Building2, Loader2, Save, Trash2, Crown } from "lucide-react";
 import { toast } from "sonner";
+import { useSubscription } from "@/contexts/SubscriptionContext";
+import { PlanBadge } from "@/components/PlanBadge";
 
 const OrganizationSettings = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { currentOrganization, isOrgOwner, isOrgAdmin, loading: orgLoading, refreshOrganization } = useOrganization();
+  const { plan } = useSubscription();
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [name, setName] = useState("");
@@ -138,7 +141,10 @@ const OrganizationSettings = () => {
             <div className="w-14 h-14 rounded-xl bg-primary flex items-center justify-center shadow-soft mb-4">
               <Building2 className="w-7 h-7 text-primary-foreground" />
             </div>
-            <CardTitle className="text-2xl">Configuración de la Organización</CardTitle>
+            <div className="flex items-center gap-3 mb-2">
+              <CardTitle className="text-2xl">Configuración de la Organización</CardTitle>
+              <PlanBadge plan={plan} />
+            </div>
             <CardDescription>
               Administra los ajustes de {currentOrganization?.name}
             </CardDescription>
@@ -226,6 +232,22 @@ const OrganizationSettings = () => {
                   placeholder="admin@empresa.com"
                 />
               </div>
+            </div>
+
+            <Separator />
+
+            {/* Billing Link */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Plan y Facturación</Label>
+                <p className="text-xs text-muted-foreground">
+                  Administra tu suscripción y límites de uso
+                </p>
+              </div>
+              <Button variant="outline" onClick={() => navigate("/billing")}>
+                <Crown className="w-4 h-4 mr-2" />
+                Ver Planes
+              </Button>
             </div>
 
             <Button 

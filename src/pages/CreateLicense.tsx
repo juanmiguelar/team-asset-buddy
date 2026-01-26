@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,8 +10,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Key, Loader2, Check, Calendar } from "lucide-react";
+import { ArrowLeft, Key, Loader2, Check } from "lucide-react";
 import { toast } from "sonner";
+import { useUpgradePrompt } from "@/components/UpgradePrompt";
 
 const productOptions = [
   { value: "adobe_cc", label: "Adobe Creative Cloud" },
@@ -30,6 +32,8 @@ const CreateLicense = () => {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   const { currentOrganization, isOrgAdmin, loading: orgLoading } = useOrganization();
+  const { canCreateLicense, loading: subLoading, refreshSubscription } = useSubscription();
+  const { showUpgradePrompt, UpgradePromptDialog } = useUpgradePrompt();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     product: "adobe_cc",
@@ -39,10 +43,17 @@ const CreateLicense = () => {
   });
 
   useEffect(() => {
-    if (!loading && !orgLoading && (!user || !isOrgAdmin)) {
+    if (!loading && !orgLoading && !subLoading && (!user || !isOrgAdmin)) {
       navigate("/");
     }
-  }, [user, isOrgAdmin, loading, orgLoading, navigate]);
+  }, [user, isOrgAdmin, loading, orgLoading, subLoading, navigate]);
+
+  useEffect(() => {
+    // Check limit on mount
+    if (!loading && !orgLoading && !subLoading && !canCreateLicense()) {
+      showUpgradePrompt('licenses');
+    }
+  }, [loading, orgLoading, subLoading, canCreateLicense]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,6 +65,12 @@ const CreateLicense = () => {
 
     if (!currentOrganization) {
       toast.error("No hay organización seleccionada");
+      return;
+    }
+
+    // Check limit before creating
+    if (!canCreateLicense()) {
+      showUpgradePrompt('licenses');
       return;
     }
 
@@ -99,6 +116,7 @@ const CreateLicense = () => {
 
     toast.success("Licencia creada exitosamente");
     setIsSubmitting(false);
+    await refreshSubscription(); // Refresh usage counts
     navigate(`/license/${newLicense.id}`);
   };
 
@@ -106,7 +124,7 @@ const CreateLicense = () => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  if (loading || orgLoading) {
+  if (loading || orgLoading || subLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -115,7 +133,9 @@ const CreateLicense = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
+      <UpgradePromptDialog />
+      <div className="min-h-screen bg-background">
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
@@ -225,7 +245,8 @@ const CreateLicense = () => {
           </CardContent>
         </Card>
       </main>
-    </div>
+      </div>
+    </>
   );
 };
 

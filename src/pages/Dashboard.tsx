@@ -1,5 +1,6 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,7 +9,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { OrganizationSwitcher } from "@/components/OrganizationSwitcher";
 import { BulkImportDialog } from "@/components/BulkImportDialog";
-import { Package, Key, QrCode, LogOut, Plus, Laptop, Users, Settings, Upload } from "lucide-react";
+import { PlanBadge } from "@/components/PlanBadge";
+import { UsageMeter } from "@/components/UsageMeter";
+import { useUpgradePrompt } from "@/components/UpgradePrompt";
+import { Package, Key, QrCode, LogOut, Plus, Laptop, Users, Settings, Upload, Crown } from "lucide-react";
 import { toast } from "sonner";
 
 interface Asset {
@@ -31,6 +35,8 @@ interface License {
 const Dashboard = () => {
   const { user, profile, signOut, loading } = useAuth();
   const { currentOrganization, isOrgAdmin, loading: orgLoading } = useOrganization();
+  const { plan, limits, usage, canCreateAsset, hasFeature, loading: subLoading } = useSubscription();
+  const { showUpgradePrompt, UpgradePromptDialog } = useUpgradePrompt();
   const navigate = useNavigate();
   const [myAssets, setMyAssets] = useState<Asset[]>([]);
   const [myLicenses, setMyLicenses] = useState<License[]>([]);
@@ -100,6 +106,21 @@ const Dashboard = () => {
     navigate("/scan");
   };
 
+  const handleCreateAsset = () => {
+    if (!canCreateAsset()) {
+      showUpgradePrompt('assets');
+      return;
+    }
+    navigate("/admin/create-asset");
+  };
+
+  const handleBulkImport = () => {
+    if (!hasFeature('bulkImport')) {
+      showUpgradePrompt('feature', 'Importación CSV masiva');
+      return;
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "available":
@@ -126,7 +147,7 @@ const Dashboard = () => {
     }
   };
 
-  if (loading || orgLoading || loadingData) {
+  if (loading || orgLoading || loadingData || subLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
@@ -141,6 +162,8 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <UpgradePromptDialog />
+      
       {/* Header */}
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -149,13 +172,19 @@ const Dashboard = () => {
               <Package className="w-5 h-5 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="font-bold text-lg">{currentOrganization?.name || "Gestor de Inventario"}</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="font-bold text-lg">{currentOrganization?.name || "Gestor de Inventario"}</h1>
+                <PlanBadge plan={plan} size="sm" />
+              </div>
               <p className="text-xs text-muted-foreground">
                 {profile?.name} {isOrgAdmin && "· Admin"}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/billing")} title="Facturación">
+              <Crown className="w-5 h-5" />
+            </Button>
             <OrganizationSwitcher />
             {isOrgAdmin && (
               <Button variant="ghost" size="icon" onClick={() => navigate("/organization/members")}>
@@ -176,25 +205,51 @@ const Dashboard = () => {
             <div className="flex items-center justify-between flex-wrap gap-2">
               <h2 className="text-2xl font-bold">Panel de Administración</h2>
               <div className="flex gap-2">
-                <BulkImportDialog
-                  trigger={
-                    <Button variant="outline">
-                      <Upload className="w-4 h-4" />
-                      Importar CSV
-                    </Button>
-                  }
-                  onImportComplete={fetchData}
-                />
+                {hasFeature('bulkImport') ? (
+                  <BulkImportDialog
+                    trigger={
+                      <Button variant="outline">
+                        <Upload className="w-4 h-4" />
+                        Importar CSV
+                      </Button>
+                    }
+                    onImportComplete={fetchData}
+                  />
+                ) : (
+                  <Button variant="outline" onClick={handleBulkImport}>
+                    <Upload className="w-4 h-4" />
+                    Importar CSV
+                  </Button>
+                )}
                 <Button variant="outline" onClick={() => navigate("/admin/create-license")}>
                   <Key className="w-4 h-4" />
                   Nueva Licencia
                 </Button>
-                <Button variant="hero" onClick={() => navigate("/admin/create-asset")}>
+                <Button variant="hero" onClick={handleCreateAsset}>
                   <Plus className="w-4 h-4" />
                   Nuevo Activo
                 </Button>
               </div>
             </div>
+
+            {/* Usage Overview */}
+            <Card className="shadow-soft">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">Uso del Plan</CardTitle>
+                  <Button variant="ghost" size="sm" onClick={() => navigate("/billing")}>
+                    Ver planes
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <UsageMeter label="Activos" current={usage.assets} max={limits.maxAssets} />
+                  <UsageMeter label="Licencias" current={usage.licenses} max={limits.maxLicenses} />
+                  <UsageMeter label="Miembros" current={usage.members} max={limits.maxMembers} />
+                </div>
+              </CardContent>
+            </Card>
 
             {/* KPIs */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
