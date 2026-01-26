@@ -11,6 +11,9 @@ import Scanner from "./pages/Scanner";
 import AssetDetail from "./pages/AssetDetail";
 import LicenseDetail from "./pages/LicenseDetail";
 import CreateAsset from "./pages/CreateAsset";
+import CreateLicense from "./pages/CreateLicense";
+import EditAsset from "./pages/EditAsset";
+import EditLicense from "./pages/EditLicense";
 import OrganizationSettings from "./pages/OrganizationSettings";
 import OrganizationMembers from "./pages/OrganizationMembers";
 import CreateOrganization from "./pages/CreateOrganization";
@@ -34,6 +37,9 @@ const App = () => (
               <Route path="/asset/:id" element={<AssetDetail />} />
               <Route path="/license/:id" element={<LicenseDetail />} />
               <Route path="/admin/create-asset" element={<CreateAsset />} />
+              <Route path="/admin/create-license" element={<CreateLicense />} />
+              <Route path="/admin/edit-asset/:id" element={<EditAsset />} />
+              <Route path="/admin/edit-license/:id" element={<EditLicense />} />
               <Route path="/organization/settings" element={<OrganizationSettings />} />
               <Route path="/organization/members" element={<OrganizationMembers />} />
               <Route path="/organization/create" element={<CreateOrganization />} />

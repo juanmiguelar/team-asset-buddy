@@ -1,10 +1,23 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOrganization } from "@/contexts/OrganizationContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { AdminActionsMenu } from "@/components/AdminActionsMenu";
 import { ArrowLeft, Package, Loader2, User, MapPin, Calendar, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -30,7 +43,8 @@ interface Profile {
 const AssetDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user, isAdmin } = useAuth();
+  const { user } = useAuth();
+  const { isOrgAdmin, currentOrganization } = useOrganization();
   const [asset, setAsset] = useState<Asset | null>(null);
   const [assignee, setAssignee] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -216,9 +230,62 @@ const AssetDetail = () => {
               <div className="w-14 h-14 rounded-xl bg-primary flex items-center justify-center shadow-soft">
                 <Package className="w-7 h-7 text-primary-foreground" />
               </div>
-              <Badge className={getStatusColor(asset.status)}>
-                {getStatusText(asset.status)}
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge className={getStatusColor(asset.status)}>
+                  {getStatusText(asset.status)}
+                </Badge>
+                {isOrgAdmin && (
+                  <AdminActionsMenu
+                    resourceType="asset"
+                    status={asset.status}
+                    onEdit={() => navigate(`/admin/edit-asset/${asset.id}`)}
+                    onMaintenance={async () => {
+                      const { error } = await supabase
+                        .from("assets")
+                        .update({ status: "maintenance", updated_at: new Date().toISOString() })
+                        .eq("id", asset.id);
+                      if (error) {
+                        toast.error("Error al cambiar estado");
+                      } else {
+                        if (user && currentOrganization) {
+                          await supabase.from("audit_log").insert({
+                            resource_type: "asset",
+                            resource_id: asset.id,
+                            action: "edit",
+                            by_user_id: user.id,
+                            organization_id: currentOrganization.id,
+                            metadata: { status_change: { old: asset.status, new: "maintenance" } },
+                          });
+                        }
+                        toast.success("Activo en mantenimiento");
+                        fetchAsset();
+                      }
+                    }}
+                    onRetire={async () => {
+                      const { error } = await supabase
+                        .from("assets")
+                        .update({ status: "retired", assignee_user_id: null, updated_at: new Date().toISOString() })
+                        .eq("id", asset.id);
+                      if (error) {
+                        toast.error("Error al retirar activo");
+                      } else {
+                        if (user && currentOrganization) {
+                          await supabase.from("audit_log").insert({
+                            resource_type: "asset",
+                            resource_id: asset.id,
+                            action: "retire",
+                            by_user_id: user.id,
+                            organization_id: currentOrganization.id,
+                            metadata: { previous_status: asset.status },
+                          });
+                        }
+                        toast.success("Activo retirado");
+                        navigate("/");
+                      }
+                    }}
+                  />
+                )}
+              </div>
             </div>
             <CardTitle className="text-2xl">{asset.name}</CardTitle>
             <CardDescription className="capitalize">
