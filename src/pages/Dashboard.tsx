@@ -57,10 +57,10 @@ const Dashboard = () => {
     
     if (assets) setMyAssets(assets);
 
-    // Fetch my licenses
+    // Fetch my licenses from safe view (excludes seat_key_full)
     const { data: licenses } = await supabase
-      .from("licenses")
-      .select("*")
+      .from("licenses_safe")
+      .select("id, product, status, expires_at, assignee_user_id")
       .eq("assignee_user_id", user?.id);
     
     if (licenses) setMyLicenses(licenses);
@@ -74,9 +74,10 @@ const Dashboard = () => {
       
       if (allAssetsData) setAllAssets(allAssetsData);
 
+      // Admins can query base table but we still use explicit columns for security
       const { data: allLicensesData } = await supabase
         .from("licenses")
-        .select("*")
+        .select("id, product, status, expires_at, assignee_user_id, seat_key_masked, created_at")
         .order("created_at", { ascending: false });
       
       if (allLicensesData) setAllLicenses(allLicensesData);

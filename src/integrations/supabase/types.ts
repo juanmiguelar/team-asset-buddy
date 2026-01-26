@@ -232,9 +232,56 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      licenses_safe: {
+        Row: {
+          assignee_user_id: string | null
+          created_at: string | null
+          expires_at: string | null
+          id: string | null
+          notes: string | null
+          product: Database["public"]["Enums"]["license_product"] | null
+          qr_code: string | null
+          seat_key_masked: string | null
+          status: Database["public"]["Enums"]["license_status"] | null
+          updated_at: string | null
+        }
+        Insert: {
+          assignee_user_id?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string | null
+          notes?: string | null
+          product?: Database["public"]["Enums"]["license_product"] | null
+          qr_code?: string | null
+          seat_key_masked?: string | null
+          status?: Database["public"]["Enums"]["license_status"] | null
+          updated_at?: string | null
+        }
+        Update: {
+          assignee_user_id?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string | null
+          notes?: string | null
+          product?: Database["public"]["Enums"]["license_product"] | null
+          qr_code?: string | null
+          seat_key_masked?: string | null
+          status?: Database["public"]["Enums"]["license_status"] | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "licenses_assignee_user_id_fkey"
+            columns: ["assignee_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      get_license_full_key: { Args: { _license_id: string }; Returns: string }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
