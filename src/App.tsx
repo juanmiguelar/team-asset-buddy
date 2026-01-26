@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import Auth from "./pages/Auth";
 import Scanner from "./pages/Scanner";
 import AssetDetail from "./pages/AssetDetail";
+import LicenseDetail from "./pages/LicenseDetail";
 import CreateAsset from "./pages/CreateAsset";
 import NotFound from "./pages/NotFound";
 
@@ -25,6 +26,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/scan" element={<Scanner />} />
             <Route path="/asset/:id" element={<AssetDetail />} />
+            <Route path="/license/:id" element={<LicenseDetail />} />
             <Route path="/admin/create-asset" element={<CreateAsset />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
