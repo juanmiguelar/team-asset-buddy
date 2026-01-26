@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { OrganizationProvider } from "./contexts/OrganizationContext";
+import { SubscriptionProvider } from "./contexts/SubscriptionContext";
 import Dashboard from "./pages/Dashboard";
 import Auth from "./pages/Auth";
 import Scanner from "./pages/Scanner";
@@ -18,6 +19,7 @@ import OrganizationSettings from "./pages/OrganizationSettings";
 import OrganizationMembers from "./pages/OrganizationMembers";
 import CreateOrganization from "./pages/CreateOrganization";
 import AcceptInvite from "./pages/AcceptInvite";
+import Billing from "./pages/Billing";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,23 +32,26 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <OrganizationProvider>
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/scan" element={<Scanner />} />
-              <Route path="/asset/:id" element={<AssetDetail />} />
-              <Route path="/license/:id" element={<LicenseDetail />} />
-              <Route path="/admin/create-asset" element={<CreateAsset />} />
-              <Route path="/admin/create-license" element={<CreateLicense />} />
-              <Route path="/admin/edit-asset/:id" element={<EditAsset />} />
-              <Route path="/admin/edit-license/:id" element={<EditLicense />} />
-              <Route path="/organization/settings" element={<OrganizationSettings />} />
-              <Route path="/organization/members" element={<OrganizationMembers />} />
-              <Route path="/organization/create" element={<CreateOrganization />} />
-              <Route path="/invite/accept" element={<AcceptInvite />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <SubscriptionProvider>
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/scan" element={<Scanner />} />
+                <Route path="/asset/:id" element={<AssetDetail />} />
+                <Route path="/license/:id" element={<LicenseDetail />} />
+                <Route path="/admin/create-asset" element={<CreateAsset />} />
+                <Route path="/admin/create-license" element={<CreateLicense />} />
+                <Route path="/admin/edit-asset/:id" element={<EditAsset />} />
+                <Route path="/admin/edit-license/:id" element={<EditLicense />} />
+                <Route path="/organization/settings" element={<OrganizationSettings />} />
+                <Route path="/organization/members" element={<OrganizationMembers />} />
+                <Route path="/organization/create" element={<CreateOrganization />} />
+                <Route path="/invite/accept" element={<AcceptInvite />} />
+                <Route path="/billing" element={<Billing />} />
+                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </SubscriptionProvider>
           </OrganizationProvider>
         </AuthProvider>
       </BrowserRouter>

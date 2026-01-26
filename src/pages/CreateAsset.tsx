@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOrganization } from "@/contexts/OrganizationContext";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,11 +12,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Package, Loader2, Check } from "lucide-react";
 import { toast } from "sonner";
+import { UpgradePrompt, useUpgradePrompt } from "@/components/UpgradePrompt";
 
 const CreateAsset = () => {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   const { currentOrganization, isOrgAdmin, loading: orgLoading } = useOrganization();
+  const { canCreateAsset, loading: subLoading, refreshSubscription } = useSubscription();
+  const { showUpgradePrompt, UpgradePromptDialog } = useUpgradePrompt();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -26,10 +30,17 @@ const CreateAsset = () => {
   });
 
   useEffect(() => {
-    if (!loading && !orgLoading && (!user || !isOrgAdmin)) {
+    if (!loading && !orgLoading && !subLoading && (!user || !isOrgAdmin)) {
       navigate("/");
     }
-  }, [user, isOrgAdmin, loading, orgLoading, navigate]);
+  }, [user, isOrgAdmin, loading, orgLoading, subLoading, navigate]);
+
+  useEffect(() => {
+    // Check limit on mount
+    if (!loading && !orgLoading && !subLoading && !canCreateAsset()) {
+      showUpgradePrompt('assets');
+    }
+  }, [loading, orgLoading, subLoading, canCreateAsset]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,6 +52,12 @@ const CreateAsset = () => {
 
     if (!currentOrganization) {
       toast.error("No hay organización seleccionada");
+      return;
+    }
+
+    // Check limit before creating
+    if (!canCreateAsset()) {
+      showUpgradePrompt('assets');
       return;
     }
 
@@ -86,6 +103,7 @@ const CreateAsset = () => {
 
     toast.success("Activo creado exitosamente");
     setIsSubmitting(false);
+    await refreshSubscription(); // Refresh usage counts
     navigate(`/asset/${newAsset.id}`);
   };
 
@@ -93,7 +111,7 @@ const CreateAsset = () => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  if (loading || orgLoading) {
+  if (loading || orgLoading || subLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -102,6 +120,8 @@ const CreateAsset = () => {
   }
 
   return (
+    <>
+      <UpgradePromptDialog />
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
@@ -215,6 +235,7 @@ const CreateAsset = () => {
         </Card>
       </main>
     </div>
+    </>
   );
 };
 

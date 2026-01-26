@@ -282,6 +282,63 @@ export type Database = {
           },
         ]
       }
+      organization_subscriptions: {
+        Row: {
+          activated_by: string | null
+          bmc_subscription_id: string | null
+          bmc_supporter_email: string | null
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          organization_id: string
+          plan: Database["public"]["Enums"]["subscription_plan"]
+          status: Database["public"]["Enums"]["subscription_status"]
+          updated_at: string
+        }
+        Insert: {
+          activated_by?: string | null
+          bmc_subscription_id?: string | null
+          bmc_supporter_email?: string | null
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          organization_id: string
+          plan?: Database["public"]["Enums"]["subscription_plan"]
+          status?: Database["public"]["Enums"]["subscription_status"]
+          updated_at?: string
+        }
+        Update: {
+          activated_by?: string | null
+          bmc_subscription_id?: string | null
+          bmc_supporter_email?: string | null
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          organization_id?: string
+          plan?: Database["public"]["Enums"]["subscription_plan"]
+          status?: Database["public"]["Enums"]["subscription_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_subscriptions_activated_by_fkey"
+            columns: ["activated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_subscriptions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizations: {
         Row: {
           created_at: string
@@ -490,6 +547,8 @@ export type Database = {
       org_role: "owner" | "admin" | "member"
       request_status: "open" | "approved" | "rejected" | "completed"
       request_type: "borrow" | "return" | "transfer"
+      subscription_plan: "free" | "pro" | "enterprise"
+      subscription_status: "active" | "canceled" | "past_due"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -639,6 +698,8 @@ export const Constants = {
       org_role: ["owner", "admin", "member"],
       request_status: ["open", "approved", "rejected", "completed"],
       request_type: ["borrow", "return", "transfer"],
+      subscription_plan: ["free", "pro", "enterprise"],
+      subscription_status: ["active", "canceled", "past_due"],
     },
   },
 } as const
