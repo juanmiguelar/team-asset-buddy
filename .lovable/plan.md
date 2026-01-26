@@ -1,347 +1,259 @@
 
-
-# Billing & Subscriptions with Buy Me a Coffee
+# Reports Dashboard with Analytics, Calendar & Audit Logs
 
 ## Overview
-Implement a subscription system using Buy Me a Coffee (BMC) as the payment provider, with manual/semi-automatic activation. This approach works perfectly for Costa Rica and gives you full control over the payment flow.
+Create a comprehensive reports dashboard for organization admins that provides visual insights into asset utilization, a calendar view of license expirations, and a searchable/exportable audit log. This feature will be gated behind the `auditLog` feature flag (available on Pro and Enterprise plans).
 
-## How Buy Me a Coffee Works for SaaS
-
-Buy Me a Coffee offers **Memberships** which are recurring subscriptions. Here's how it works:
-
-1. You create membership tiers on BMC (e.g., Pro $29/month, Enterprise $99/month)
-2. Users click a link to your BMC membership page
-3. They subscribe and pay through BMC
-4. You receive a notification via email or webhook
-5. You activate their subscription in your app
-
-BMC also has a webhook API that can automatically notify your app when someone subscribes!
-
----
+## Current State Analysis
+- Dashboard shows basic KPI cards (total assets, assigned, available, licenses)
+- No visualization charts for asset utilization trends
+- No calendar view for license expirations
+- Audit log exists in database but no UI to view it
+- `hasFeature('auditLog')` check already exists in SubscriptionContext
+- Recharts library is already installed and chart components exist
+- Calendar component (react-day-picker) is already available
 
 ## Architecture
 
 ```text
-+-------------------+     +------------------+     +------------------+
-| Buy Me a Coffee   |     | Edge Function    |     | Database         |
-| (Membership Page) |---->| Webhook Handler  |---->| organization_    |
-|                   |     |                  |     | subscriptions    |
-+-------------------+     +------------------+     +------------------+
-        ^                                                   |
-        |                                                   v
-+-------------------+                        +---------------------------+
-| User Clicks       |                        | SubscriptionContext       |
-| "Upgrade" Button  |                        | - currentPlan             |
-+-------------------+                        | - limits                  |
-                                             | - canCreate()             |
-                                             +---------------------------+
-                                                        |
-                               +----------+----------+----------+
-                               |          |          |          |
-                               v          v          v          v
-                         CreateAsset  Dashboard  Members  CreateLicense
-                         (enforces    (shows     (limit   (enforces
-                          limits)      plan)     check)    limits)
+Reports Page (/reports)
++-------------------------------------------------------------+
+|  [Header with navigation]                                   |
++-------------------------------------------------------------+
+|                                                             |
+|  +------------------------+  +----------------------------+ |
+|  | Asset Utilization      |  | Asset Distribution         | |
+|  | [Pie Chart]            |  | [Bar Chart by Category]    | |
+|  | - Available: X         |  |                            | |
+|  | - Assigned: X          |  |                            | |
+|  | - Maintenance: X       |  |                            | |
+|  | - Retired: X           |  |                            | |
+|  +------------------------+  +----------------------------+ |
+|                                                             |
+|  +--------------------------------------------------------+ |
+|  | License Expiration Calendar                             | |
+|  | [Calendar with colored indicators for expiring licenses]| |
+|  | [List of licenses expiring in selected period]         | |
+|  +--------------------------------------------------------+ |
+|                                                             |
+|  +--------------------------------------------------------+ |
+|  | Audit Log                                               | |
+|  | [Filters: Date Range, Action Type, Resource Type]       | |
+|  | [Search bar]                                            | |
+|  | [Table with logs]                                       | |
+|  | [Export CSV button]                                     | |
+|  +--------------------------------------------------------+ |
+|                                                             |
++-------------------------------------------------------------+
 ```
 
----
+## Implementation Plan
 
-## Database Schema
+### Phase 1: Reports Page Structure
 
-### New Table: `organization_subscriptions`
+Create `src/pages/Reports.tsx` as the main container:
+- Route: `/reports`
+- Admin-only access (redirect non-admins)
+- Feature-gated: Show upgrade prompt if `!hasFeature('auditLog')`
+- Tabbed interface with three sections:
+  1. Overview (charts)
+  2. License Calendar
+  3. Audit Log
 
-| Column | Type | Description |
-|--------|------|-------------|
-| id | UUID | Primary key |
-| organization_id | UUID | FK to organizations (unique) |
-| plan | subscription_plan (enum) | 'free', 'pro', 'enterprise' |
-| status | subscription_status (enum) | 'active', 'canceled', 'past_due' |
-| bmc_supporter_email | TEXT | Email used on BMC (for matching) |
-| bmc_subscription_id | TEXT | BMC subscription identifier |
-| activated_by | UUID | User who activated (for manual) |
-| current_period_start | TIMESTAMPTZ | Billing period start |
-| current_period_end | TIMESTAMPTZ | Billing period end |
-| created_at | TIMESTAMPTZ | Creation timestamp |
-| updated_at | TIMESTAMPTZ | Last update |
+### Phase 2: Asset Utilization Charts
 
-### New Enum: `subscription_plan`
-- `free` - Default, limited features
-- `pro` - Standard paid ($29/month)
-- `enterprise` - Full features ($99/month)
+**Data queries:**
+- Count assets by status (available, assigned, maintenance, retired)
+- Count assets by category (laptop, monitor, dock, peripheral, other)
+- Count licenses by status and product type
 
-### New Enum: `subscription_status`
-- `active` - Currently subscribed
-- `canceled` - Subscription ended
-- `past_due` - Payment failed
+**Chart Components:**
 
----
+| Chart | Type | Data |
+|-------|------|------|
+| Asset Status | Pie/Donut | Breakdown by status |
+| Asset Categories | Bar | Count per category |
+| License Products | Pie | Distribution by product |
+| License Status | Donut | Available/Assigned/Expired |
 
-## Plan Limits
+Using existing Recharts components:
+- `PieChart` with `ChartContainer` and `ChartTooltip`
+- `BarChart` for category distribution
+- Custom colors matching the app theme
 
-Defined in code for easy adjustment:
+### Phase 3: License Expiration Calendar
 
-| Feature | Free | Pro | Enterprise |
-|---------|------|-----|------------|
-| Max Assets | 10 | 100 | Unlimited |
-| Max Licenses | 5 | 50 | Unlimited |
-| Max Members | 3 | 15 | Unlimited |
-| Bulk CSV Import | No | Yes | Yes |
-| Audit Log Access | No | Yes | Yes |
-| Priority Support | No | No | Yes |
+**Features:**
+- Calendar view using react-day-picker (already installed)
+- Visual indicators for days with expiring licenses:
+  - Red dot: Expired or expiring today
+  - Orange dot: Expiring within 7 days
+  - Yellow dot: Expiring within 30 days
+- Click on a day to see licenses expiring on that date
+- List view of upcoming expirations (next 30/60/90 days)
 
----
+**Data query:**
+- Fetch all licenses with `expires_at` not null
+- Group by expiration date for calendar display
+- Sort by expiration date for list view
 
-## Implementation Steps
+### Phase 4: Audit Log Viewer
 
-### Phase 1: Database & Context
+**Table columns:**
+| Column | Source |
+|--------|--------|
+| Fecha | timestamp |
+| Accion | action (translated) |
+| Recurso | resource_type + name from join |
+| Usuario | by_user_id (join to profiles) |
+| Detalles | metadata (formatted) |
 
-1. Create migration for `organization_subscriptions` table
-2. Auto-create `free` subscription for each organization
-3. Create `SubscriptionContext.tsx` with:
-   - Current plan detection
-   - Limit checking functions (`canCreateAsset()`, `canInviteMember()`)
-   - Feature gates (`hasFeature('bulkImport')`)
-4. Create `src/lib/plans.ts` with plan definitions
+**Filters:**
+- Date range picker (last 7 days, 30 days, 90 days, custom)
+- Action type dropdown (check_out, check_in, create, edit, retire, assign_override)
+- Resource type (asset, license)
+- Search by user name or resource name
 
-### Phase 2: Usage Enforcement
+**Export:**
+- CSV export button
+- Includes all filtered results
+- Format: Date, Action, Resource Type, Resource Name, User, Details
 
-Modify existing pages to check limits before actions:
+### Phase 5: Export Functionality
 
-1. **CreateAsset.tsx** - Block if at asset limit
-2. **CreateLicense.tsx** - Block if at license limit
-3. **InviteMemberDialog.tsx** - Block if at member limit
-4. **BulkImportDialog.tsx** - Show upgrade prompt if on Free plan
+Create `src/lib/exportCsv.ts`:
+- Function to convert array of objects to CSV string
+- Handle special characters and commas in fields
+- Trigger browser download with timestamp in filename
 
-### Phase 3: Billing UI
-
-1. **Billing Page** (`src/pages/Billing.tsx`):
-   - Current plan display with badge
-   - Usage meters (assets, licenses, members)
-   - Plan comparison table
-   - Upgrade buttons linking to your BMC membership page
-   - Payment instructions for manual activation
-
-2. **Upgrade Prompt Component** (`src/components/UpgradePrompt.tsx`):
-   - Shown when user hits a limit
-   - Explains the limit and shows upgrade CTA
-
-3. **Dashboard Updates**:
-   - Plan badge next to organization name
-   - Usage indicator in admin panel
-
-### Phase 4: BMC Webhook (Optional but Recommended)
-
-Create an edge function to receive BMC webhooks:
-- Endpoint: `/functions/v1/bmc-webhook`
-- Validates webhook signature
-- Matches supporter email to organization
-- Auto-activates subscription
-
-### Phase 5: Manual Activation
-
-For cases where webhook matching fails:
-- Admin page to manually activate subscriptions
-- Enter BMC supporter email + select plan
-- Useful for bank transfers or custom arrangements
-
----
+**Audit Log CSV columns:**
+```csv
+Fecha,Hora,Accion,Tipo Recurso,ID Recurso,Usuario,Detalles
+2025-10-01,04:35:48,check_out,asset,abb572e9...,John Doe,"{old_status: available}"
+```
 
 ## Files to Create
 
 | File | Description |
 |------|-------------|
-| `src/contexts/SubscriptionContext.tsx` | Subscription state management |
-| `src/pages/Billing.tsx` | Billing dashboard with plans |
-| `src/components/UpgradePrompt.tsx` | Limit reached modal |
-| `src/components/UsageMeter.tsx` | Visual usage bar |
-| `src/components/PlanBadge.tsx` | Small plan indicator |
-| `src/lib/plans.ts` | Plan definitions and limits |
-| `supabase/functions/bmc-webhook/index.ts` | BMC webhook handler |
+| `src/pages/Reports.tsx` | Main reports page with tabs |
+| `src/components/reports/AssetUtilizationCharts.tsx` | Pie and bar charts for assets |
+| `src/components/reports/LicenseExpirationCalendar.tsx` | Calendar with expiration markers |
+| `src/components/reports/AuditLogViewer.tsx` | Filterable table with export |
+| `src/lib/exportCsv.ts` | CSV export utility function |
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/App.tsx` | Add billing route, wrap with SubscriptionProvider |
-| `src/contexts/OrganizationContext.tsx` | Fetch subscription with org |
-| `src/pages/Dashboard.tsx` | Show plan badge, usage in admin panel |
-| `src/pages/CreateAsset.tsx` | Add limit check |
-| `src/pages/CreateLicense.tsx` | Add limit check |
-| `src/components/InviteMemberDialog.tsx` | Add member limit check |
-| `src/components/BulkImportDialog.tsx` | Add feature gate |
-| `src/pages/OrganizationSettings.tsx` | Add billing link |
+| `src/App.tsx` | Add `/reports` route |
+| `src/pages/Dashboard.tsx` | Add "Reports" button for admins |
 
----
+## Route Configuration
 
-## UI Components
+| Route | Component | Access |
+|-------|-----------|--------|
+| `/reports` | Reports | Admin only, Feature-gated |
 
-### Billing Page Layout
-
-```text
-+------------------------------------------+
-|  [Crown] Plan Actual: FREE               |
-|                                          |
-|  Uso Actual:                             |
-|  +---------------------------------+     |
-|  | Activos    ████████░░  8/10    |     |
-|  | Licencias  ██░░░░░░░░  2/5     |     |
-|  | Miembros   ██████░░░░  2/3     |     |
-|  +---------------------------------+     |
-+------------------------------------------+
-
-+------------+  +------------+  +------------+
-|   FREE     |  |    PRO     |  | ENTERPRISE |
-|   $0/mes   |  |  $29/mes   |  |  $99/mes   |
-|            |  |            |  |            |
-| 10 activos |  | 100 activos|  | Ilimitado  |
-| 5 licencias|  | 50 licencia|  | Ilimitado  |
-| 3 miembros |  | 15 miembros|  | Ilimitado  |
-|            |  | + CSV      |  | + Todo Pro |
-|            |  | + Auditoria|  | + Soporte  |
-|            |  |            |  |            |
-| [Actual]   |  | [Upgrade]  |  | [Contactar]|
-+------------+  +------------+  +------------+
-
-+------------------------------------------+
-|  Como Actualizar:                        |
-|  1. Haz clic en el plan deseado         |
-|  2. Completa el pago en Buy Me a Coffee |
-|  3. Tu plan se activa automaticamente   |
-|     (o contactanos para activacion)     |
-+------------------------------------------+
-```
-
-### Upgrade Prompt (shown when limit reached)
-
-```text
-+------------------------------------------+
-|  [Crown Icon]                            |
-|  Limite Alcanzado                        |
-|                                          |
-|  Has alcanzado el limite de 10 activos   |
-|  en el plan Free.                        |
-|                                          |
-|  Actualiza a Pro para agregar hasta      |
-|  100 activos y desbloquear mas.          |
-|                                          |
-|  [Ver Planes]        [Cerrar]            |
-+------------------------------------------+
-```
-
----
-
-## Buy Me a Coffee Setup Instructions
-
-After implementation, you'll need to:
-
-1. **Create Membership Tiers on BMC**:
-   - Pro Tier: $29/month
-   - Enterprise Tier: $99/month
-
-2. **Get Your BMC Webhook Secret**:
-   - Go to BMC Dashboard > Settings > Webhooks
-   - Add webhook URL: `https://hoaivkgkgomhfxtkbyad.supabase.co/functions/v1/bmc-webhook`
-   - Copy the webhook secret
-
-3. **Configure Secrets**:
-   - Add `BMC_WEBHOOK_SECRET` to your edge function secrets
-
-4. **Get Your Membership Page URL**:
-   - e.g., `https://buymeacoffee.com/yourusername/membership`
-
----
-
-## Technical Details
-
-### SubscriptionContext Structure
+## Feature Gating Logic
 
 ```typescript
-interface SubscriptionContextType {
-  subscription: OrganizationSubscription | null;
-  plan: 'free' | 'pro' | 'enterprise';
-  limits: PlanLimits;
-  usage: Usage;
-  loading: boolean;
-  
-  // Limit checks
-  canCreateAsset: () => boolean;
-  canCreateLicense: () => boolean;
-  canInviteMember: () => boolean;
-  
-  // Feature checks
-  hasFeature: (feature: string) => boolean;
-  
-  // Refresh
-  refreshSubscription: () => Promise<void>;
+// In Reports.tsx
+const { hasFeature } = useSubscription();
+
+if (!hasFeature('auditLog')) {
+  return <UpgradePrompt limitType="feature" featureName="Reportes y Auditoria" />;
 }
 ```
 
-### Plan Limits Definition
+## Data Queries
+
+### Asset Utilization
+```typescript
+// Count by status
+const { data: statusCounts } = await supabase
+  .from("assets")
+  .select("status")
+  .eq("organization_id", orgId);
+
+// Group and count in JS
+const statusData = Object.entries(
+  statusCounts.reduce((acc, a) => {
+    acc[a.status] = (acc[a.status] || 0) + 1;
+    return acc;
+  }, {})
+);
+```
+
+### License Expirations
+```typescript
+const { data: licenses } = await supabase
+  .from("licenses")
+  .select("id, product, expires_at, status")
+  .eq("organization_id", orgId)
+  .not("expires_at", "is", null)
+  .order("expires_at", { ascending: true });
+```
+
+### Audit Log with Joins
+```typescript
+const { data: logs } = await supabase
+  .from("audit_log")
+  .select(`
+    *,
+    by_user:profiles!audit_log_by_user_id_fkey(name, email),
+    to_user:profiles!audit_log_to_user_id_fkey(name, email)
+  `)
+  .eq("organization_id", orgId)
+  .gte("timestamp", dateFrom)
+  .lte("timestamp", dateTo)
+  .order("timestamp", { ascending: false })
+  .limit(100);
+```
+
+## UI/UX Details
+
+### Chart Colors (matching app theme)
+- Available: `hsl(142, 76%, 36%)` (green)
+- Assigned: `hsl(221, 83%, 53%)` (blue)
+- Maintenance: `hsl(45, 93%, 47%)` (yellow)
+- Retired: `hsl(220, 9%, 46%)` (gray)
+- Expired: `hsl(0, 84%, 60%)` (red)
+
+### Calendar Styling
+- Dot indicators below date numbers
+- Tooltip on hover showing count of expiring licenses
+- Click to expand list of licenses for that date
+
+### Audit Log Table
+- Striped rows for readability
+- Collapsible metadata details
+- Pagination (25 per page)
+- Loading skeleton while fetching
+
+### Mobile Responsiveness
+- Charts stack vertically on mobile
+- Calendar uses compact view
+- Audit log becomes card-based on small screens
+
+## Action Translation Map
 
 ```typescript
-export const PLAN_LIMITS = {
-  free: {
-    maxAssets: 10,
-    maxLicenses: 5,
-    maxMembers: 3,
-    features: {
-      bulkImport: false,
-      auditLog: false,
-      prioritySupport: false,
-    }
-  },
-  pro: {
-    maxAssets: 100,
-    maxLicenses: 50,
-    maxMembers: 15,
-    features: {
-      bulkImport: true,
-      auditLog: true,
-      prioritySupport: false,
-    }
-  },
-  enterprise: {
-    maxAssets: Infinity,
-    maxLicenses: Infinity,
-    maxMembers: Infinity,
-    features: {
-      bulkImport: true,
-      auditLog: true,
-      prioritySupport: true,
-    }
-  }
+const ACTION_LABELS: Record<string, string> = {
+  check_out: "Asignacion",
+  check_in: "Devolucion",
+  create: "Creacion",
+  edit: "Edicion",
+  retire: "Retiro",
+  assign_override: "Reasignacion",
 };
 ```
 
-### BMC Webhook Payload Example
+## Summary
 
-```json
-{
-  "type": "membership.started",
-  "data": {
-    "supporter_email": "user@company.com",
-    "membership_level_id": 12345,
-    "is_active": true,
-    "current_price": 29
-  }
-}
-```
-
----
-
-## Security Considerations
-
-1. **Webhook Verification**: Validate BMC webhook signatures
-2. **Server-side Enforcement**: Check limits before database inserts
-3. **Grace Period**: 7-day grace for failed renewals
-4. **RLS Policies**: Subscription data scoped to organization
-
----
-
-## Migration Strategy
-
-For existing organizations:
-- All existing orgs get `free` plan by default
-- If you have paying customers, manually activate their subscriptions
-- No data loss or breaking changes
-
+This implementation adds a comprehensive Reports dashboard that:
+1. Visualizes asset and license utilization with interactive charts
+2. Provides a calendar view to track license expirations proactively
+3. Enables admins to view, filter, and export the complete audit trail
+4. Is properly gated behind the Pro/Enterprise subscription tier
+5. Follows existing UI patterns and uses already-installed dependencies
