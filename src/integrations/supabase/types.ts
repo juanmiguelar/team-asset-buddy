@@ -23,6 +23,7 @@ export type Database = {
           location: string | null
           name: string
           notes: string | null
+          organization_id: string | null
           qr_code: string
           serial_number: string | null
           status: Database["public"]["Enums"]["asset_status"]
@@ -36,6 +37,7 @@ export type Database = {
           location?: string | null
           name: string
           notes?: string | null
+          organization_id?: string | null
           qr_code: string
           serial_number?: string | null
           status?: Database["public"]["Enums"]["asset_status"]
@@ -49,6 +51,7 @@ export type Database = {
           location?: string | null
           name?: string
           notes?: string | null
+          organization_id?: string | null
           qr_code?: string
           serial_number?: string | null
           status?: Database["public"]["Enums"]["asset_status"]
@@ -62,6 +65,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "assets_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       audit_log: {
@@ -70,6 +80,7 @@ export type Database = {
           by_user_id: string
           id: string
           metadata: Json | null
+          organization_id: string | null
           resource_id: string
           resource_type: string
           timestamp: string
@@ -80,6 +91,7 @@ export type Database = {
           by_user_id: string
           id?: string
           metadata?: Json | null
+          organization_id?: string | null
           resource_id: string
           resource_type: string
           timestamp?: string
@@ -90,6 +102,7 @@ export type Database = {
           by_user_id?: string
           id?: string
           metadata?: Json | null
+          organization_id?: string | null
           resource_id?: string
           resource_type?: string
           timestamp?: string
@@ -101,6 +114,13 @@ export type Database = {
             columns: ["by_user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
           {
@@ -119,6 +139,7 @@ export type Database = {
           expires_at: string | null
           id: string
           notes: string | null
+          organization_id: string | null
           product: Database["public"]["Enums"]["license_product"]
           qr_code: string
           seat_key_full: string | null
@@ -132,6 +153,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           notes?: string | null
+          organization_id?: string | null
           product: Database["public"]["Enums"]["license_product"]
           qr_code: string
           seat_key_full?: string | null
@@ -145,6 +167,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           notes?: string | null
+          organization_id?: string | null
           product?: Database["public"]["Enums"]["license_product"]
           qr_code?: string
           seat_key_full?: string | null
@@ -160,7 +183,131 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "licenses_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      organization_invites: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string
+          organization_id: string
+          role: Database["public"]["Enums"]["org_role"]
+          token: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          invited_by: string
+          organization_id: string
+          role?: Database["public"]["Enums"]["org_role"]
+          token?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string
+          organization_id?: string
+          role?: Database["public"]["Enums"]["org_role"]
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_invites_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_invites_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_members: {
+        Row: {
+          created_at: string
+          id: string
+          organization_id: string
+          role: Database["public"]["Enums"]["org_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          organization_id: string
+          role?: Database["public"]["Enums"]["org_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          organization_id?: string
+          role?: Database["public"]["Enums"]["org_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_members_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          settings: Json | null
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          settings?: Json | null
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          settings?: Json | null
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -191,6 +338,7 @@ export type Database = {
           created_at: string
           id: string
           notes: string | null
+          organization_id: string | null
           requester_user_id: string
           resource_id: string
           resource_type: string
@@ -202,6 +350,7 @@ export type Database = {
           created_at?: string
           id?: string
           notes?: string | null
+          organization_id?: string | null
           requester_user_id: string
           resource_id: string
           resource_type: string
@@ -213,6 +362,7 @@ export type Database = {
           created_at?: string
           id?: string
           notes?: string | null
+          organization_id?: string | null
           requester_user_id?: string
           resource_id?: string
           resource_type?: string
@@ -221,6 +371,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "requests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "requests_requester_user_id_fkey"
             columns: ["requester_user_id"]
@@ -239,6 +396,7 @@ export type Database = {
           expires_at: string | null
           id: string | null
           notes: string | null
+          organization_id: string | null
           product: Database["public"]["Enums"]["license_product"] | null
           qr_code: string | null
           seat_key_masked: string | null
@@ -251,6 +409,7 @@ export type Database = {
           expires_at?: string | null
           id?: string | null
           notes?: string | null
+          organization_id?: string | null
           product?: Database["public"]["Enums"]["license_product"] | null
           qr_code?: string | null
           seat_key_masked?: string | null
@@ -263,6 +422,7 @@ export type Database = {
           expires_at?: string | null
           id?: string | null
           notes?: string | null
+          organization_id?: string | null
           product?: Database["public"]["Enums"]["license_product"] | null
           qr_code?: string | null
           seat_key_masked?: string | null
@@ -277,12 +437,37 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "licenses_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
     Functions: {
+      generate_org_slug: { Args: { _name: string }; Returns: string }
       get_license_full_key: { Args: { _license_id: string }; Returns: string }
+      get_user_org_id: { Args: { _user_id: string }; Returns: string }
+      has_org_role: {
+        Args: {
+          _org_id: string
+          _role: Database["public"]["Enums"]["org_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_org_admin: {
+        Args: { _org_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_org_member: {
+        Args: { _org_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "employee"
@@ -302,6 +487,7 @@ export type Database = {
         | "github"
         | "other"
       license_status: "available" | "assigned" | "expired"
+      org_role: "owner" | "admin" | "member"
       request_status: "open" | "approved" | "rejected" | "completed"
       request_type: "borrow" | "return" | "transfer"
     }
@@ -450,6 +636,7 @@ export const Constants = {
         "other",
       ],
       license_status: ["available", "assigned", "expired"],
+      org_role: ["owner", "admin", "member"],
       request_status: ["open", "approved", "rejected", "completed"],
       request_type: ["borrow", "return", "transfer"],
     },

@@ -1,11 +1,13 @@
 import { useAuth } from "@/contexts/AuthContext";
+import { useOrganization } from "@/contexts/OrganizationContext";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Package, Key, QrCode, LogOut, Plus, BarChart3, Laptop, CheckCircle2 } from "lucide-react";
+import { OrganizationSwitcher } from "@/components/OrganizationSwitcher";
+import { Package, Key, QrCode, LogOut, Plus, Laptop, Users, Settings } from "lucide-react";
 import { toast } from "sonner";
 
 interface Asset {
@@ -26,7 +28,8 @@ interface License {
 }
 
 const Dashboard = () => {
-  const { user, profile, isAdmin, signOut, loading } = useAuth();
+  const { user, profile, signOut, loading } = useAuth();
+  const { currentOrganization, isOrgAdmin, loading: orgLoading } = useOrganization();
   const navigate = useNavigate();
   const [myAssets, setMyAssets] = useState<Asset[]>([]);
   const [myLicenses, setMyLicenses] = useState<License[]>([]);
@@ -41,10 +44,10 @@ const Dashboard = () => {
   }, [user, loading, navigate]);
 
   useEffect(() => {
-    if (user) {
+    if (user && currentOrganization && !orgLoading) {
       fetchData();
     }
-  }, [user]);
+  }, [user, currentOrganization, orgLoading]);
 
   const fetchData = async () => {
     setLoadingData(true);
@@ -66,7 +69,7 @@ const Dashboard = () => {
     if (licenses) setMyLicenses(licenses);
 
     // For admin, fetch all items
-    if (isAdmin) {
+    if (isOrgAdmin) {
       const { data: allAssetsData } = await supabase
         .from("assets")
         .select("*")
@@ -122,7 +125,7 @@ const Dashboard = () => {
     }
   };
 
-  if (loading || loadingData) {
+  if (loading || orgLoading || loadingData) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
@@ -145,21 +148,29 @@ const Dashboard = () => {
               <Package className="w-5 h-5 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="font-bold text-lg">Gestor de Inventario</h1>
+              <h1 className="font-bold text-lg">{currentOrganization?.name || "Gestor de Inventario"}</h1>
               <p className="text-xs text-muted-foreground">
-                {profile?.name} {isAdmin && "· Admin"}
+                {profile?.name} {isOrgAdmin && "· Admin"}
               </p>
             </div>
           </div>
-          <Button variant="ghost" size="icon" onClick={handleSignOut}>
-            <LogOut className="w-5 h-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <OrganizationSwitcher />
+            {isOrgAdmin && (
+              <Button variant="ghost" size="icon" onClick={() => navigate("/organization/members")}>
+                <Users className="w-5 h-5" />
+              </Button>
+            )}
+            <Button variant="ghost" size="icon" onClick={handleSignOut}>
+              <LogOut className="w-5 h-5" />
+            </Button>
+          </div>
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-6 pb-24">
         {/* Admin Dashboard */}
-        {isAdmin && (
+        {isOrgAdmin && (
           <div className="space-y-6 mb-8">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold">Panel de Administración</h2>
@@ -349,10 +360,10 @@ const Dashboard = () => {
             <QrCode className="w-5 h-5 mb-1" />
             <span className="text-xs">Escanear</span>
           </Button>
-          {isAdmin && (
-            <Button variant="ghost" className="flex-col h-auto py-3" onClick={() => navigate("/admin")}>
-              <BarChart3 className="w-5 h-5 mb-1" />
-              <span className="text-xs">Admin</span>
+          {isOrgAdmin && (
+            <Button variant="ghost" className="flex-col h-auto py-3" onClick={() => navigate("/organization/settings")}>
+              <Settings className="w-5 h-5 mb-1" />
+              <span className="text-xs">Ajustes</span>
             </Button>
           )}
         </div>

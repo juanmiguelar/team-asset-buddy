@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOrganization } from "@/contexts/OrganizationContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +14,8 @@ import { toast } from "sonner";
 
 const CreateAsset = () => {
   const navigate = useNavigate();
-  const { user, isAdmin, loading } = useAuth();
+  const { user, loading } = useAuth();
+  const { currentOrganization, isOrgAdmin, loading: orgLoading } = useOrganization();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -24,10 +26,10 @@ const CreateAsset = () => {
   });
 
   useEffect(() => {
-    if (!loading && (!user || !isAdmin)) {
+    if (!loading && !orgLoading && (!user || !isOrgAdmin)) {
       navigate("/");
     }
-  }, [user, isAdmin, loading, navigate]);
+  }, [user, isOrgAdmin, loading, orgLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,9 +39,14 @@ const CreateAsset = () => {
       return;
     }
 
+    if (!currentOrganization) {
+      toast.error("No hay organización seleccionada");
+      return;
+    }
+
     setIsSubmitting(true);
 
-    // Create asset with temp QR code
+    // Create asset with temp QR code and organization_id
     const tempId = crypto.randomUUID();
     const { data: newAsset, error } = await supabase
       .from("assets")
@@ -50,6 +57,7 @@ const CreateAsset = () => {
         serial_number: formData.serial_number || null,
         location: formData.location || null,
         notes: formData.notes || null,
+        organization_id: currentOrganization.id,
       })
       .select()
       .single();
@@ -62,12 +70,13 @@ const CreateAsset = () => {
     }
 
     // Create audit log
-    if (user) {
+    if (user && currentOrganization) {
       await supabase.from("audit_log").insert({
         resource_type: "asset",
         resource_id: newAsset.id,
         action: "create",
         by_user_id: user.id,
+        organization_id: currentOrganization.id,
         metadata: {
           name: formData.name,
           category: formData.category,
@@ -84,7 +93,7 @@ const CreateAsset = () => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  if (loading) {
+  if (loading || orgLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
