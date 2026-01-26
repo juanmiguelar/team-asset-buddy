@@ -12,7 +12,7 @@ import { BulkImportDialog } from "@/components/BulkImportDialog";
 import { PlanBadge } from "@/components/PlanBadge";
 import { UsageMeter } from "@/components/UsageMeter";
 import { useUpgradePrompt } from "@/components/UpgradePrompt";
-import { Package, Key, QrCode, LogOut, Plus, Laptop, Users, Settings, Upload, Crown } from "lucide-react";
+import { Package, Key, QrCode, LogOut, Plus, Laptop, Users, Settings, Upload, Crown, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 
 interface Asset {
@@ -205,6 +205,12 @@ const Dashboard = () => {
             <div className="flex items-center justify-between flex-wrap gap-2">
               <h2 className="text-2xl font-bold">Panel de Administración</h2>
               <div className="flex gap-2">
+                {hasFeature('auditLog') && (
+                  <Button variant="outline" onClick={() => navigate("/reports")}>
+                    <BarChart3 className="w-4 h-4" />
+                    Reportes
+                  </Button>
+                )}
                 {hasFeature('bulkImport') ? (
                   <BulkImportDialog
                     trigger={

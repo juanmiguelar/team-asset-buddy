@@ -20,6 +20,7 @@ import OrganizationMembers from "./pages/OrganizationMembers";
 import CreateOrganization from "./pages/CreateOrganization";
 import AcceptInvite from "./pages/AcceptInvite";
 import Billing from "./pages/Billing";
+import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -48,6 +49,7 @@ const App = () => (
                 <Route path="/organization/create" element={<CreateOrganization />} />
                 <Route path="/invite/accept" element={<AcceptInvite />} />
                 <Route path="/billing" element={<Billing />} />
+                <Route path="/reports" element={<Reports />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
